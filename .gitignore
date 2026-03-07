@@ -1,0 +1,59 @@
+# ========================
+# Java
+# ========================
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# ========================
+# Package Files
+# ========================
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# ========================
+# Gradle
+# ========================
+.gradle/
+.gradle-local/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ========================
+# IntelliJ IDEA
+# ========================
+.idea/
+*.iml
+out/
+
+# ========================
+# VS Code
+# ========================
+.vscode/
+
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.*
+gcp-credentials.json
+application-local.yml
+
+# ========================
+# Logs
+# ========================
+logs/
+
+.gradle-local/

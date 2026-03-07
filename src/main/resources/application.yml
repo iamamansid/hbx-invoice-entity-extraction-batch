@@ -1,0 +1,53 @@
+
+spring:
+  application:
+    name: hbx-invoice-entity-extraction-batch
+
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+      
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/invoice_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  neo4j:
+    uri: ${NEO4J_URI:neo4j+s://<dbid>.databases.neo4j.io}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:secret}
+
+gcp:
+  project-id: ${GCP_PROJECT_ID:my-gcp-project}
+  bucket-name: ${GCP_BUCKET_NAME:my-invoice-bucket}
+#  credentials-path: ${GCP_CREDENTIALS_PATH:classpath:gcp-credentials.json}
+
+vertex:
+  ai:
+    endpoint: ${VERTEX_AI_ENDPOINT:aiplatform.googleapis.com}
+    model: ${VERTEX_AI_MODEL:gemini-2.5-flash-lite}
+    api-key: ${VERTEX_AI_API_KEY:your-vertex-api-key}
+
+groq:
+  api:
+    key: ${GROQ_API_KEY:your-groq-key}
+    endpoint: ${GROQ_API_ENDPOINT:https://api.groq.com/openai/v1/chat/completions}
+
+mistral:
+  api:
+    key: ${MISTRAL_API_KEY:your-mistral-key}
+    endpoint: ${MISTRAL_API_ENDPOINT:https://api.mistral.ai/v1/chat/completions}
+    model: ${MISTRAL_API_MODEL:mistral-small-latest}
+
+together:
+  api:
+    key: ${TOGETHER_API_KEY:your-together-key}
+    endpoint: ${TOGETHER_API_ENDPOINT:https://api.together.xyz/v1/chat/completions}
+
+bigquery:
+  dataset-id: ${BQ_DATASET_ID:invoice_research}
+  table-id: ${BQ_TABLE_ID:model_evaluation_metrics}
