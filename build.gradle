@@ -2,7 +2,20 @@
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.3'
-	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+// Compatibility shim for IDE-generated Gradle init scripts that still call
+// project.convention.findPlugin(...) on Gradle 9+, where project.convention was removed.
+if (!hasProperty('convention')) {
+	ext.convention = new Object() {
+		Object findPlugin(Object pluginType) {
+			plugins.findPlugin(org.gradle.api.plugins.JavaPlugin)
+		}
+	}
+}
+
+if (!hasProperty('JavaPluginConvention')) {
+	ext.JavaPluginConvention = org.gradle.api.plugins.JavaPlugin
 }
 
 group = 'com.research'
@@ -26,6 +39,8 @@ repositories {
 }
 
 dependencies {
+	implementation platform('org.springframework.boot:spring-boot-dependencies:4.0.3')
+
 	implementation 'org.springframework.boot:spring-boot-starter-batch'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -48,8 +63,8 @@ dependencies {
 	// JSON Handling
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
     
-	compileOnly 'org.projectlombok:lombok'
-	annotationProcessor 'org.projectlombok:lombok'
+	compileOnly 'org.projectlombok:lombok:1.18.38'
+	annotationProcessor 'org.projectlombok:lombok:1.18.38'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
