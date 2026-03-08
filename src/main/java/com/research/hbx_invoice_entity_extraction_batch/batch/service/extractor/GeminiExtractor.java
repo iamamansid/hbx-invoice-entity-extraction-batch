@@ -32,7 +32,7 @@ public class GeminiExtractor extends AbstractLlmExtractor {
 
     @Override
     public String getModelName() {
-        return "gemini";
+        return modelName;
     }
 
     @Override

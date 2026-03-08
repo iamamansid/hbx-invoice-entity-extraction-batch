@@ -32,7 +32,7 @@ public class MistralExtractor extends AbstractLlmExtractor {
 
     @Override
     public String getModelName() {
-        return "mistral";
+        return model;
     }
 
     @Override

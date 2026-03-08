@@ -32,7 +32,7 @@ public class LlamaExtractor extends AbstractLlmExtractor {
 
     @Override
     public String getModelName() {
-        return "llama";
+        return model;
     }
 
     @Override
