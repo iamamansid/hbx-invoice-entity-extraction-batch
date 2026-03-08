@@ -42,6 +42,7 @@ groq:
   api:
     key: ${GROQ_API_KEY:your-groq-key}
     endpoint: ${GROQ_API_ENDPOINT:https://api.groq.com/openai/v1/chat/completions}
+    model: ${GROQ_API_MODEL:llama-3.3-70b-versatile}
 
 mistral:
   api:

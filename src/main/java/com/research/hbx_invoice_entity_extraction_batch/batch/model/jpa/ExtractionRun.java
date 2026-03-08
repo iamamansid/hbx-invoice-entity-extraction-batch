@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -35,6 +37,7 @@ public class ExtractionRun {
     @Column(name = "run_number")
     private Integer runNumber;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "extracted_json", columnDefinition = "JSONB")
     private String extractedJson;
 

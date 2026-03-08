@@ -23,6 +23,9 @@ public class LlamaExtractor extends AbstractLlmExtractor {
     @Value("${groq.api.key}")
     private String apiKey;
 
+    @Value("${groq.api.model:llama-3.3-70b-versatile}")
+    private String model;
+
     public LlamaExtractor(RestTemplate restTemplate, ObjectMapper objectMapper) {
         super(restTemplate, objectMapper);
     }
@@ -43,7 +46,7 @@ public class LlamaExtractor extends AbstractLlmExtractor {
         headers.setBearerAuth(apiKey);
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "llama-3.1-70b-versatile");
+        requestBody.put("model", model);
         
         // System and User messages
         Map<String, String> userMessage = new HashMap<>();

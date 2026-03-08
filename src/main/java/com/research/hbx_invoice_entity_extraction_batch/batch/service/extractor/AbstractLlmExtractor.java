@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 @Slf4j
@@ -134,8 +135,22 @@ public abstract class AbstractLlmExtractor implements Extractor {
                         String.class
                 );
                 return response.getBody();
+            } catch (RestClientResponseException e) {
+                // Include provider response details to make model/key/config issues visible in logs.
+                String details = String.format(
+                        "HTTP %d from %s endpoint: %s",
+                        e.getStatusCode().value(),
+                        getModelName(),
+                        truncate(e.getResponseBodyAsString())
+                );
+                lastException = new RuntimeException(details, e);
+                log.error("Attempt {} failed for {}: {}", attempt, getModelName(), details);
+                if (e.getStatusCode().is4xxClientError()) {
+                    break; // Do not retry permanent client errors.
+                }
             } catch (RestClientException e) {
                 lastException = e;
+                log.error("Attempt {} failed for {}: {}", attempt, getModelName(), e.getMessage());
                 if (attempt == 3) {
                     break;
                 }
@@ -143,6 +158,14 @@ public abstract class AbstractLlmExtractor implements Extractor {
             }
         }
         throw new RuntimeException("LLM API call failed after 3 attempts", lastException);
+    }
+
+    private String truncate(String s) {
+        if (s == null) {
+            return "";
+        }
+        int max = 500;
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 
     protected HttpHeaders createJsonHeaders() {
