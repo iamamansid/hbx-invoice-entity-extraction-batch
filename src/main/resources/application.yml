@@ -43,11 +43,6 @@ mistral:
     endpoint: ${MISTRAL_API_ENDPOINT:https://api.mistral.ai/v1/chat/completions}
     model: ${MISTRAL_API_MODEL:mistral-small-latest}
 
-together:
-  api:
-    key: ${TOGETHER_API_KEY:your-together-key}
-    endpoint: ${TOGETHER_API_ENDPOINT:https://api.together.xyz/v1/chat/completions}
-
 bigquery:
   dataset-id: ${BQ_DATASET_ID:invoice_research}
   table-id: ${BQ_TABLE_ID:model_evaluation_metrics}

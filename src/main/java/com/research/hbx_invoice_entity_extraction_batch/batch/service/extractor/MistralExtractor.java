@@ -17,10 +17,10 @@ import java.util.Map;
 @Component
 public class MistralExtractor extends AbstractLlmExtractor {
 
-    @Value("${mistral.api.endpoint:${TOGETHER_API_ENDPOINT:https://api.mistral.ai/v1/chat/completions}}")
+    @Value("${mistral.api.endpoint}")
     private String endpointUrl;
 
-    @Value("${mistral.api.key:${TOGETHER_API_KEY:your-mistral-key}}")
+    @Value("${mistral.api.key}")
     private String apiKey;
 
     @Value("${mistral.api.model:mistral-small-latest}")

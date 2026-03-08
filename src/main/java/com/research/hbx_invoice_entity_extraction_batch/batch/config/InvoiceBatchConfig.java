@@ -71,6 +71,34 @@ public class InvoiceBatchConfig {
     }
 
     @Bean
+    public Job ocrJob() {
+        return new JobBuilder("ocrJob", jobRepository)
+                .start(ocrStep())
+                .build();
+    }
+
+    @Bean
+    public Job extractionJob() {
+        return new JobBuilder("extractionJob", jobRepository)
+                .start(extractionStep())
+                .build();
+    }
+
+    @Bean
+    public Job evaluationJob() {
+        return new JobBuilder("evaluationJob", jobRepository)
+                .start(evaluationStep())
+                .build();
+    }
+
+    @Bean
+    public Job exportJob() {
+        return new JobBuilder("exportJob", jobRepository)
+                .start(bigQueryExportStep())
+                .build();
+    }
+
+    @Bean
     public Step ocrStep() {
         return new StepBuilder("ocrStep", jobRepository)
                 .<GcsInvoiceItem, InvoiceOcrResult>chunk(10, transactionManager)
