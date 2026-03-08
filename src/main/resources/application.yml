@@ -15,6 +15,12 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
   neo4j:
     uri: ${NEO4J_URI:neo4j+s://<dbid>.databases.neo4j.io}
     authentication:
@@ -24,7 +30,7 @@ spring:
 gcp:
   project-id: ${GCP_PROJECT_ID:my-gcp-project}
   bucket-name: ${GCP_BUCKET_NAME:my-invoice-bucket}
-#  credentials-path: ${GCP_CREDENTIALS_PATH:classpath:gcp-credentials.json}
+  credentials-path: ${GCP_CREDENTIALS_PATH:classpath:gcp-credentials.json}
 
 vertex:
   ai:
