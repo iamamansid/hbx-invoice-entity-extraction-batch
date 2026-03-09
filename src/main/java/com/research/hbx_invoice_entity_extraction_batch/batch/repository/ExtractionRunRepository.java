@@ -17,4 +17,6 @@ public interface ExtractionRunRepository extends JpaRepository<ExtractionRun, Ex
     Page<String> findDistinctInvoiceIdsForEvaluation(Pageable pageable);
 
     List<ExtractionRun> findByInvoiceId(String invoiceId);
+
+    List<ExtractionRun> findByInvoiceIdAndRunNumber(String invoiceId, Integer runNumber);
 }
