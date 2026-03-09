@@ -4,7 +4,6 @@ import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.Extracti
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.ExtractionRunResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.InvoiceOcrResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor.Extractor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
@@ -20,11 +19,18 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ParallelExtractionProcessor implements ItemProcessor<InvoiceOcrResult, ExtractionBundle> {
 
     private final List<Extractor> extractors;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(16); // Parallelism for 4 models * 3 runs
+    private final ExecutorService executorService;
+
+    public ParallelExtractionProcessor(List<Extractor> extractors) {
+        this.extractors = extractors;
+        int threadCount = Math.max(8, extractors.size() * 3);
+        this.executorService = Executors.newFixedThreadPool(threadCount);
+        log.info("Configured {} extraction models: {}", extractors.size(),
+                extractors.stream().map(Extractor::getModelName).collect(Collectors.joining(", ")));
+    }
 
     @Override
     public ExtractionBundle process(InvoiceOcrResult item) throws Exception {

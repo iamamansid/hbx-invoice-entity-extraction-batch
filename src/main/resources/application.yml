@@ -32,14 +32,58 @@ gcp:
   bucket-name: ${GCP_BUCKET_NAME:my-invoice-bucket}
   credentials-path: ${GCP_CREDENTIALS_PATH:classpath:gcp-credentials.json}
 
+extraction:
+  models:
+    - name: gemini-2.5-pro
+      provider: VERTEX_GEMINI
+      modelId: gemini-2.5-pro
+    - name: gemini-2.0-flash
+      provider: VERTEX_GEMINI
+      modelId: gemini-2.0-flash
+    - name: llama-3.3-70b
+      provider: VERTEX_MAAS
+      modelId: meta/llama-3.3-70b-instruct-maas
+    - name: llama-4-maverick
+      provider: VERTEX_MAAS
+      modelId: meta/llama-4-maverick-17b-128e-instruct-maas
+    - name: mistral-medium
+      provider: MISTRAL
+      modelId: mistral-medium-latest
+
 vertex:
   ai:
     endpoint: ${VERTEX_AI_ENDPOINT:aiplatform.googleapis.com}
-    model: ${VERTEX_AI_MODEL:gemini-2.5-flash-lite}
     api-key: ${VERTEX_AI_API_KEY:your-vertex-api-key}
+    gemini-pro-model: ${VERTEX_GEMINI_PRO_MODEL:gemini-2.5-pro}
+    gemini-flash-model: ${VERTEX_GEMINI_FLASH_MODEL:gemini-2.0-flash}
+
+  maas:
+    project-id: ${VERTEX_MAAS_PROJECT_ID:${GCP_PROJECT_ID:my-gcp-project}}
+    access-token: ${VERTEX_MAAS_ACCESS_TOKEN:}
+    endpoint-template: ${VERTEX_MAAS_ENDPOINT_TEMPLATE:https://%s/%s/projects/%s/locations/%s/endpoints/openapi/chat/completions}
+
+    llama33:
+      name: ${VERTEX_MAAS_LLAMA33_NAME:llama-3.3-70b}
+      model-id: ${VERTEX_MAAS_LLAMA33_MODEL_ID:meta/llama-3.3-70b-instruct-maas}
+      endpoint: ${VERTEX_MAAS_LLAMA33_ENDPOINT:us-central1-aiplatform.googleapis.com}
+      api-version: ${VERTEX_MAAS_LLAMA33_API_VERSION:v1beta1}
+      location: ${VERTEX_MAAS_LLAMA33_LOCATION:us-central1}
+      stream: ${VERTEX_MAAS_LLAMA33_STREAM:false}
+      max-tokens: ${VERTEX_MAAS_LLAMA33_MAX_TOKENS:512}
+      temperature: ${VERTEX_MAAS_LLAMA33_TEMPERATURE:0.5}
+      top-p: ${VERTEX_MAAS_LLAMA33_TOP_P:0.95}
+
+    llama4:
+      name: ${VERTEX_MAAS_LLAMA4_NAME:llama-4-maverick}
+      model-id: ${VERTEX_MAAS_LLAMA4_MODEL_ID:meta/llama-4-maverick-17b-128e-instruct-maas}
+      endpoint: ${VERTEX_MAAS_LLAMA4_ENDPOINT:us-east5-aiplatform.googleapis.com}
+      api-version: ${VERTEX_MAAS_LLAMA4_API_VERSION:v1}
+      location: ${VERTEX_MAAS_LLAMA4_LOCATION:us-east5}
+      stream: ${VERTEX_MAAS_LLAMA4_STREAM:false}
 
 groq:
   api:
+    enabled: ${GROQ_API_ENABLED:false}
     key: ${GROQ_API_KEY:your-groq-key}
     endpoint: ${GROQ_API_ENDPOINT:https://api.groq.com/openai/v1/chat/completions}
     model: ${GROQ_API_MODEL:llama-3.3-70b-versatile}
@@ -48,7 +92,12 @@ mistral:
   api:
     key: ${MISTRAL_API_KEY:your-mistral-key}
     endpoint: ${MISTRAL_API_ENDPOINT:https://api.mistral.ai/v1/chat/completions}
-    model: ${MISTRAL_API_MODEL:mistral-small-latest}
+    name: ${MISTRAL_API_NAME:mistral-medium}
+    model: ${MISTRAL_API_MODEL:mistral-medium-latest}
+
+regex:
+  extractor:
+    enabled: ${REGEX_EXTRACTOR_ENABLED:false}
 
 bigquery:
   dataset-id: ${BQ_DATASET_ID:invoice_research}

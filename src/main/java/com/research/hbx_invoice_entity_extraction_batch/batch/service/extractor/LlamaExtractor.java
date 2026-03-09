@@ -3,7 +3,9 @@ package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,8 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@Order(90)
+@ConditionalOnProperty(name = "groq.api.enabled", havingValue = "true", matchIfMissing = false)
 public class LlamaExtractor extends AbstractLlmExtractor {
 
     @Value("${groq.api.endpoint}")
@@ -23,7 +27,7 @@ public class LlamaExtractor extends AbstractLlmExtractor {
     @Value("${groq.api.key}")
     private String apiKey;
 
-    @Value("${groq.api.model:llama-3.3-70b-versatile}")
+    @Value("${groq.api.model:llama-3.1-70b}")
     private String model;
 
     public LlamaExtractor(RestTemplate restTemplate, ObjectMapper objectMapper) {

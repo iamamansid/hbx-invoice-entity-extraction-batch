@@ -16,19 +16,19 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@Order(1)
-public class GeminiExtractor extends AbstractLlmExtractor {
+@Order(2)
+public class GeminiFlashExtractor extends AbstractLlmExtractor {
 
     @Value("${vertex.ai.endpoint}")
     private String endpoint;
-    
-    @Value("${vertex.ai.gemini-pro-model:gemini-2.5-pro}")
+
+    @Value("${vertex.ai.gemini-flash-model:gemini-2.0-flash}")
     private String modelName;
 
     @Value("${vertex.ai.api-key}")
     private String apiKey;
 
-    public GeminiExtractor(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public GeminiFlashExtractor(RestTemplate restTemplate, ObjectMapper objectMapper) {
         super(restTemplate, objectMapper);
     }
 
@@ -39,8 +39,6 @@ public class GeminiExtractor extends AbstractLlmExtractor {
 
     @Override
     protected String getEndpointUrl() {
-        // API-key based Vertex pattern:
-        // https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:streamGenerateContent?key=...
         return String.format("https://%s/v1/publishers/google/models/%s:streamGenerateContent?key=%s",
                 endpoint, modelName, apiKey);
     }
@@ -52,14 +50,13 @@ public class GeminiExtractor extends AbstractLlmExtractor {
         Map<String, Object> requestMap = new HashMap<>();
         Map<String, Object> contents = new HashMap<>();
         contents.put("role", "user");
-        
+
         Map<String, Object> parts = new HashMap<>();
         parts.put("text", prompt);
-        
+
         contents.put("parts", List.of(parts));
         requestMap.put("contents", List.of(contents));
 
-        // Enforce JSON output for Gemini
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("responseMimeType", "application/json");
         requestMap.put("generationConfig", generationConfig);

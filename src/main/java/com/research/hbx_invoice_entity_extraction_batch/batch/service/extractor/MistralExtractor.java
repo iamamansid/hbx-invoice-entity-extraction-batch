@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@Order(5)
 public class MistralExtractor extends AbstractLlmExtractor {
 
     @Value("${mistral.api.endpoint}")
@@ -23,8 +25,11 @@ public class MistralExtractor extends AbstractLlmExtractor {
     @Value("${mistral.api.key}")
     private String apiKey;
 
-    @Value("${mistral.api.model:mistral-small-latest}")
+    @Value("${mistral.api.model:mistral-medium-latest}")
     private String model;
+
+    @Value("${mistral.api.name:mistral-medium}")
+    private String modelName;
 
     public MistralExtractor(RestTemplate restTemplate, ObjectMapper objectMapper) {
         super(restTemplate, objectMapper);
@@ -32,7 +37,7 @@ public class MistralExtractor extends AbstractLlmExtractor {
 
     @Override
     public String getModelName() {
-        return model;
+        return modelName;
     }
 
     @Override

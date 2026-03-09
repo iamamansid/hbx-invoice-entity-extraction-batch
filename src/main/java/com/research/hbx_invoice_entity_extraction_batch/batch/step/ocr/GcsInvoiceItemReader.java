@@ -5,6 +5,8 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.GcsInvoiceItem;
+import com.research.hbx_invoice_entity_extraction_batch.batch.repository.InvoiceRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.listener.StepExecutionListener;
@@ -17,11 +19,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Component
 @StepScope
+@RequiredArgsConstructor
 public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStream, StepExecutionListener {
 
     @Value("${gcp.project-id}")
@@ -29,6 +34,8 @@ public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStr
     
     @Value("${gcp.bucket-name}")
     private String bucketName;
+
+    private final InvoiceRepository invoiceRepository;
 
     private List<GcsInvoiceItem> items;
     private int currentIndex = 0;
@@ -48,12 +55,19 @@ public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStr
     public void open(ExecutionContext executionContext) throws ItemStreamException {
         if (items == null) {
             items = new ArrayList<>();
+            Set<String> completedOcrInvoiceIds = new HashSet<>(invoiceRepository.findInvoiceIdsWithCompletedOcr());
+            int skippedCount = 0;
+
             Storage storage = StorageOptions.newBuilder().setProjectId(projectId).build().getService();
             Page<Blob> blobs = storage.list(bucketName, Storage.BlobListOption.prefix("invoices/"));
             
             for (Blob blob : blobs.iterateAll()) {
                 if (!blob.isDirectory()) {
                     String invoiceId = extractInvoiceId(blob.getName());
+                    if (completedOcrInvoiceIds.contains(invoiceId)) {
+                        skippedCount++;
+                        continue;
+                    }
                     items.add(GcsInvoiceItem.builder()
                             .gcsPath("gs://" + bucketName + "/" + blob.getName())
                             .fileName(blob.getName())
@@ -61,7 +75,8 @@ public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStr
                             .build());
                 }
             }
-            log.info("Loaded {} invoices from GCS bucket {}", items.size(), bucketName);
+            log.info("Loaded {} invoices from GCS bucket {} (skipped {} already OCR-processed invoices)",
+                    items.size(), bucketName, skippedCount);
         }
 
         ExecutionContext jobContext = getJobExecutionContextOrFallback(executionContext);

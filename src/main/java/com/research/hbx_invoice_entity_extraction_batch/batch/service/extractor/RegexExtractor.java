@@ -7,6 +7,8 @@ import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.Extracti
 import com.research.hbx_invoice_entity_extraction_batch.batch.service.NormalizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Matcher;
@@ -14,6 +16,8 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Component
+@Order(91)
+@ConditionalOnProperty(name = "regex.extractor.enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class RegexExtractor implements Extractor {
 
@@ -21,9 +25,9 @@ public class RegexExtractor implements Extractor {
     private final NormalizationService normalizationService;
 
     private static final Pattern DATE_PATTERN = Pattern.compile("\\b(0?[1-9]|[12][0-9]|3[01])[./-](0?[1-9]|1[0-2])[./-](19|20)\\d{2}\\b");
-    private static final Pattern AMOUNT_PATTERN = Pattern.compile("\\b\\d{1,3}(,\\d{3})*(\\.\\d{2})\\b");
+    private static final Pattern AMOUNT_PATTERN = Pattern.compile("(?i)(?:total|amount|balance|subtotal|tax|due)[^\\n]{0,30}?\\b(\\d{1,3}(?:,\\d{3})*\\.\\d{2})\\b");
     private static final Pattern INVOICE_NO_PATTERN = Pattern.compile("(?i)(invoice\\s*(number|no|#)[:\\s]*[#]?[A-Z0-9\\-]+)");
-    private static final Pattern COMPANY_PATTERN = Pattern.compile("(Company:|Bank Name:|Account Name:)\\s*([A-Z][a-zA-Z0-9\\s]*)");
+    private static final Pattern COMPANY_PATTERN = Pattern.compile("(?:Client\\s+)?(?:Company|Bank Name|Account Name):\\s*([A-Z][a-zA-Z0-9\\s&.,]+)");
 
     // "COMPANY: keywords ["Company:", "Bank Name:", "Account Name:"] followed by capitalized words"
     
@@ -65,7 +69,7 @@ public class RegexExtractor implements Extractor {
             ArrayNode companyArray = root.putArray("COMPANY");
             Matcher companyMatcher = COMPANY_PATTERN.matcher(sourceText);
             while (companyMatcher.find()) {
-                String c = companyMatcher.group(2).trim();
+                String c = companyMatcher.group(1).trim();
                 companyArray.add(normalizationService.normalizeCompany(c));
             }
             
@@ -96,6 +100,6 @@ public class RegexExtractor implements Extractor {
 
     @Override
     public String getModelName() {
-        return "regex";
+        return "regex-v2";
     }
 }
