@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Slf4j
@@ -28,6 +29,10 @@ import java.util.Set;
 @StepScope
 @RequiredArgsConstructor
 public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStream, StepExecutionListener {
+
+    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
+            "pdf", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp", "gif"
+    );
 
     @Value("${gcp.project-id}")
     private String projectId;
@@ -56,27 +61,32 @@ public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStr
         if (items == null) {
             items = new ArrayList<>();
             Set<String> completedOcrInvoiceIds = new HashSet<>(invoiceRepository.findInvoiceIdsWithCompletedOcr());
-            int skippedCount = 0;
+            int skippedCompletedCount = 0;
+            int skippedNonFileCount = 0;
 
             Storage storage = StorageOptions.newBuilder().setProjectId(projectId).build().getService();
             Page<Blob> blobs = storage.list(bucketName, Storage.BlobListOption.prefix("invoices/"));
             
             for (Blob blob : blobs.iterateAll()) {
-                if (!blob.isDirectory()) {
-                    String invoiceId = extractInvoiceId(blob.getName());
-                    if (completedOcrInvoiceIds.contains(invoiceId)) {
-                        skippedCount++;
-                        continue;
-                    }
-                    items.add(GcsInvoiceItem.builder()
-                            .gcsPath("gs://" + bucketName + "/" + blob.getName())
-                            .fileName(blob.getName())
-                            .invoiceId(invoiceId)
-                            .build());
+                if (!isProcessableFileBlob(blob)) {
+                    skippedNonFileCount++;
+                    continue;
                 }
+
+                String invoiceId = extractInvoiceId(blob.getName());
+                if (completedOcrInvoiceIds.contains(invoiceId)) {
+                    skippedCompletedCount++;
+                    continue;
+                }
+
+                items.add(GcsInvoiceItem.builder()
+                        .gcsPath("gs://" + bucketName + "/" + blob.getName())
+                        .fileName(blob.getName())
+                        .invoiceId(invoiceId)
+                        .build());
             }
-            log.info("Loaded {} invoices from GCS bucket {} (skipped {} already OCR-processed invoices)",
-                    items.size(), bucketName, skippedCount);
+            log.info("Loaded {} invoices from GCS bucket {} (skipped {} already OCR-processed invoices, skipped {} non-file objects)",
+                    items.size(), bucketName, skippedCompletedCount, skippedNonFileCount);
         }
 
         ExecutionContext jobContext = getJobExecutionContextOrFallback(executionContext);
@@ -100,14 +110,42 @@ public class GcsInvoiceItemReader implements ItemReader<GcsInvoiceItem>, ItemStr
     }
 
     private String extractInvoiceId(String fileName) {
-        // invoices/invoice-123.jpg -> invoice-123
-        String[] parts = fileName.split("/");
-        String base = parts[parts.length - 1];
+        String base = extractBaseName(fileName);
         int dotIdx = base.lastIndexOf('.');
         if (dotIdx > 0) {
             return base.substring(0, dotIdx);
         }
         return base;
+    }
+
+    private boolean isProcessableFileBlob(Blob blob) {
+        if (blob == null) {
+            return false;
+        }
+
+        String blobName = blob.getName();
+        if (blobName == null || blobName.isBlank()) {
+            return false;
+        }
+
+        // Directory markers can appear even without Blob#isDirectory() reporting true.
+        if (blob.isDirectory() || blobName.endsWith("/")) {
+            return false;
+        }
+
+        String baseName = extractBaseName(blobName);
+        int dotIdx = baseName.lastIndexOf('.');
+        if (dotIdx <= 0 || dotIdx == baseName.length() - 1) {
+            return false;
+        }
+
+        String extension = baseName.substring(dotIdx + 1).toLowerCase(Locale.ROOT);
+        return SUPPORTED_EXTENSIONS.contains(extension);
+    }
+
+    private String extractBaseName(String path) {
+        int lastSlashIdx = path.lastIndexOf('/');
+        return lastSlashIdx >= 0 ? path.substring(lastSlashIdx + 1) : path;
     }
 
     @Override
