@@ -12,8 +12,7 @@ RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 COPY src src
 
-RUN --mount=type=cache,target=/home/gradle/.gradle \
-    ./gradlew --no-daemon clean bootJar -x test
+RUN ./gradlew --no-daemon clean bootJar -x test
 
 FROM eclipse-temurin:17-jre-jammy AS runtime
 WORKDIR /app
