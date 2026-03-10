@@ -1,0 +1,9 @@
+.git
+.gitignore
+.idea
+.gradle
+.gradle-local
+build
+out
+*.log
+boot_*.log
