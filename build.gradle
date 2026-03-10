@@ -59,6 +59,7 @@ dependencies {
 	implementation 'com.google.cloud:google-cloud-vision'
 	implementation 'com.google.cloud:google-cloud-storage'
 	implementation 'com.google.cloud:google-cloud-bigquery'
+	implementation 'com.google.cloud.sql:postgres-socket-factory:1.19.0'
 
 	// JSON Handling
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
