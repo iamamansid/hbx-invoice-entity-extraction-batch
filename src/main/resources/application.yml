@@ -101,3 +101,20 @@ regex:
 bigquery:
   dataset-id: ${BQ_DATASET_ID:invoice_research}
   table-id: ${BQ_TABLE_ID:model_evaluation_metrics}
+
+batch:
+  launcher:
+    core-pool-size: ${BATCH_LAUNCHER_CORE_POOL_SIZE:1}
+    max-pool-size: ${BATCH_LAUNCHER_MAX_POOL_SIZE:2}
+    queue-capacity: ${BATCH_LAUNCHER_QUEUE_CAPACITY:20}
+  neo4j:
+    driver:
+      max-connection-pool-size: ${NEO4J_MAX_CONNECTION_POOL_SIZE:200}
+      connection-acquisition-timeout-ms: ${NEO4J_CONNECTION_ACQUISITION_TIMEOUT_MS:120000}
+      connection-timeout-ms: ${NEO4J_CONNECTION_TIMEOUT_MS:30000}
+      max-connection-lifetime-ms: ${NEO4J_MAX_CONNECTION_LIFETIME_MS:1800000}
+      max-transaction-retry-time-ms: ${NEO4J_MAX_TRANSACTION_RETRY_TIME_MS:30000}
+      enable-leaked-session-logging: ${NEO4J_ENABLE_LEAKED_SESSION_LOGGING:true}
+    write:
+      max-attempts: ${NEO4J_WRITE_MAX_ATTEMPTS:3}
+      backoff-ms: ${NEO4J_WRITE_BACKOFF_MS:2000}
