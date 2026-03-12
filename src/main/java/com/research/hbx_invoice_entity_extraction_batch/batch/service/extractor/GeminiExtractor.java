@@ -1,3 +1,4 @@
+// src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/GeminiExtractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -60,9 +61,11 @@ public class GeminiExtractor extends AbstractLlmExtractor {
         requestMap.put("contents", List.of(contents));
 
         // Enforce JSON output for Gemini
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("responseMimeType", "application/json");
-        requestMap.put("generationConfig", generationConfig);
+        requestMap.put("generationConfig", Map.of(
+                "temperature", getTemperature(getCurrentRunNumber()),
+                "maxOutputTokens", 1024,
+                "responseMimeType", "application/json"
+        ));
 
         return new HttpEntity<>(objectMapper.writeValueAsString(requestMap), headers);
     }

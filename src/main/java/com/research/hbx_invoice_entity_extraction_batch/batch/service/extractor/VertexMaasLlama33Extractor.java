@@ -1,3 +1,4 @@
+// src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/VertexMaasLlama33Extractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -48,9 +49,6 @@ public class VertexMaasLlama33Extractor extends AbstractLlmExtractor {
     @Value("${vertex.maas.llama33.max-tokens:512}")
     private int maxTokens;
 
-    @Value("${vertex.maas.llama33.temperature:0.5}")
-    private double temperature;
-
     @Value("${vertex.maas.llama33.top-p:0.95}")
     private double topP;
 
@@ -76,7 +74,7 @@ public class VertexMaasLlama33Extractor extends AbstractLlmExtractor {
         requestBody.put("model", modelId);
         requestBody.put("stream", stream);
         requestBody.put("max_tokens", maxTokens);
-        requestBody.put("temperature", temperature);
+        requestBody.put("temperature", getTemperature(getCurrentRunNumber()));
         requestBody.put("top_p", topP);
 
         Map<String, Object> userMessage = new HashMap<>();

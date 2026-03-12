@@ -1,3 +1,4 @@
+// src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/AbstractLlmExtractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,6 +19,7 @@ public abstract class AbstractLlmExtractor implements Extractor {
 
     protected final RestTemplate restTemplate;
     protected final ObjectMapper objectMapper;
+    private final ThreadLocal<Integer> currentRunNumber = new ThreadLocal<>();
 
     protected static final String PROMPT_TEMPLATE = """
             You are a structured data extraction assistant.
@@ -47,6 +49,7 @@ public abstract class AbstractLlmExtractor implements Extractor {
     public ExtractionRunResult extract(String invoiceId, String text, int runNumber) {
         long start = System.currentTimeMillis();
         String prompt = PROMPT_TEMPLATE.replace("{{text}}", text != null ? text : "");
+        currentRunNumber.set(runNumber);
 
         try {
             long latency;
@@ -120,6 +123,8 @@ public abstract class AbstractLlmExtractor implements Extractor {
                     .errorMessage(e.getMessage())
                     .latencyMs((int) (System.currentTimeMillis() - start))
                     .build();
+        } finally {
+            currentRunNumber.remove();
         }
     }
 
@@ -172,6 +177,11 @@ public abstract class AbstractLlmExtractor implements Extractor {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
+    }
+
+    protected int getCurrentRunNumber() {
+        Integer runNumber = currentRunNumber.get();
+        return runNumber == null ? 1 : runNumber;
     }
 
     protected abstract HttpEntity<String> buildRequestEntity(String prompt) throws Exception;

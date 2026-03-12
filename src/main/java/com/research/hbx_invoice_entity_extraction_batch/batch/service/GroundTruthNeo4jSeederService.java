@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class GroundTruthNeo4jSeederService {
 
     private final Driver neo4jDriver;
+    private final NormalizationService normalizationService;
 
     public void seedGroundTruth(GroundTruthConsensus gt) {
         try (Session session = neo4jDriver.session()) {
@@ -43,11 +44,15 @@ public class GroundTruthNeo4jSeederService {
 
                 // Step C
                 for (String value : splitCsv(gt.getConsensusDates())) {
+                    String normalizedDate = normalizationService.normalizeDate(value);
+                    if (normalizedDate == null) {
+                        continue;
+                    }
                     tx.run("""
                             MATCH (i:InvoiceNode {invoiceNo: $invoiceNo, isGroundTruth: true})
                             MERGE (d:DateNode {value: $value, isGroundTruth: true})
                             MERGE (i)-[:HAS_DATE]->(d)
-                            """, Map.of("invoiceNo", invoiceNo, "value", value));
+                            """, Map.of("invoiceNo", invoiceNo, "value", normalizedDate));
                 }
 
                 // Step D

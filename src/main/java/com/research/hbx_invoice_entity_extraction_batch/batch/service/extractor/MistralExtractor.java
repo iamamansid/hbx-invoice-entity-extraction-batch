@@ -1,3 +1,4 @@
+// src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/MistralExtractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -52,6 +53,8 @@ public class MistralExtractor extends AbstractLlmExtractor {
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", model);
+        requestBody.put("temperature", getTemperature(getCurrentRunNumber()));
+        requestBody.put("max_tokens", 1024);
         
         // System and User messages
         Map<String, String> userMessage = new HashMap<>();

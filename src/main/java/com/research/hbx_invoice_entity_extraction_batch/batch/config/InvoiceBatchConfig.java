@@ -26,6 +26,7 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.support.CompositeItemWriter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -49,6 +50,8 @@ public class InvoiceBatchConfig {
     private final ParallelExtractionProcessor extractionProcessor;
     private final ExtractionRunJpaWriter extractionJpaWriter;
     private final ExtractionRunNeo4jWriter extractionNeo4jWriter;
+    @Qualifier("groundTruthConsensusStep")
+    private final Step groundTruthConsensusStep;
 
     // Evaluation Step Components
     private final PostgresExtractionRunReader evaluationReader;
@@ -65,6 +68,7 @@ public class InvoiceBatchConfig {
         return new JobBuilder("invoiceExtractionJob", jobRepository)
                 .start(ocrStep())
                 .next(extractionStep())
+                .next(groundTruthConsensusStep)
                 .next(evaluationStep())
                 .next(bigQueryExportStep())
                 .build();

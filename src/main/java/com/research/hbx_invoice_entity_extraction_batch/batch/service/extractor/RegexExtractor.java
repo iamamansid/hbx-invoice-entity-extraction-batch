@@ -28,7 +28,10 @@ public class RegexExtractor implements Extractor {
     private final ObjectMapper objectMapper;
     private final NormalizationService normalizationService;
 
-    private static final Pattern DATE_PATTERN = Pattern.compile("\\b(?:(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])|(0?[1-9]|[12]\\d|3[01])[.\\/-](0?[1-9]|1[0-2])[.\\/-]((?:19|20)\\d{2}))\\b");
+    private static final Pattern DATE_PATTERN = Pattern.compile(
+            "\\b(?<iso>\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01]))"
+                    + "|(?<eu>(?:0?[1-9]|[12]\\d|3[01])[./-](?:0?[1-9]|1[0-2])[./-](?:19|20)\\d{2})\\b"
+    );
     private static final Pattern LABELED_AMOUNT_PATTERN = Pattern.compile(
             "(?i)(?:total|amount\\s*due|balance\\s*due|grand\\s*total|subtotal|sub\\s*total|tax|vat|gst|due|payment\\s*due|invoice\\s*total|net\\s*total)[^\\n\\r]{0,60}?(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2}))",
             Pattern.CASE_INSENSITIVE
@@ -107,16 +110,16 @@ public class RegexExtractor implements Extractor {
     }
 
     private Set<String> extractDates(String text) {
-        Set<String> dates = new LinkedHashSet<>();
         Matcher dateMatcher = DATE_PATTERN.matcher(text);
+        Set<String> seen = new LinkedHashSet<>();
         while (dateMatcher.find()) {
             String raw = dateMatcher.group(0);
             String normalized = normalizationService.normalizeDate(raw);
             if (normalized != null && !normalized.isBlank()) {
-                dates.add(normalized);
+                seen.add(normalized);
             }
         }
-        return dates;
+        return seen;
     }
 
     private Set<String> extractAmounts(String text) {
