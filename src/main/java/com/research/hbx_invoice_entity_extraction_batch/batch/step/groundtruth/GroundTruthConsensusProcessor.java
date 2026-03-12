@@ -26,31 +26,64 @@ public class GroundTruthConsensusProcessor implements ItemProcessor<String, Grou
 
     @Override
     public GroundTruthConsensus process(String invoiceId) throws Exception {
-        List<ExtractionRun> runs = extractionRunRepository.findByInvoiceIdAndRunNumber(invoiceId, 1);
-        if (runs == null || runs.size() < 2) {
-            log.warn("Skipping {} - insufficient runs", invoiceId);
-            return null;
+        try {
+            log.info("Processing ground truth consensus for invoice {}", invoiceId);
+            List<ExtractionRun> runs = extractionRunRepository.findByInvoiceIdAndRunNumber(invoiceId, 1);
+            if (runs == null || runs.size() < 2) {
+                int found = runs == null ? 0 : runs.size();
+                log.warn("Skipping {} - insufficient run_number=1 rows. Found={}", invoiceId, found);
+                return null;
+            }
+
+            ConsensusGroundTruthService.ConsensusResult result =
+                    consensusGroundTruthService.computeConsensus(invoiceId, runs);
+
+            if (result.modelsAgreed() < 2) {
+                log.warn(
+                        "Skipping {} - only {} completed model outputs available for consensus",
+                        invoiceId,
+                        result.modelsAgreed()
+                );
+                return null;
+            }
+
+            log.info(
+                    "Consensus evaluation for {}: modelsConsidered={}, requiredVotes={}, fieldsWithConsensus={}, invoiceNoConsensus={}, dates={}, amounts={}, companies={}",
+                    invoiceId,
+                    result.modelsAgreed(),
+                    result.requiredVotes(),
+                    result.fieldsWithConsensus(),
+                    result.invoiceNo() != null,
+                    result.dates().size(),
+                    result.amounts().size(),
+                    result.companies().size()
+            );
+
+            if (result.fieldsWithConsensus() == 0) {
+                log.warn(
+                        "No consensus reached for invoice {} (requiredVotes={}, modelsConsidered={})",
+                        invoiceId,
+                        result.requiredVotes(),
+                        result.modelsAgreed()
+                );
+                return null;
+            }
+
+            return GroundTruthConsensus.builder()
+                    .invoiceId(invoiceId)
+                    .consensusInvoiceNo(result.invoiceNo())
+                    .consensusDates(joinAsCsv(result.dates()))
+                    .consensusAmounts(joinAsCsv(result.amounts()))
+                    .consensusCompanies(joinAsCsv(result.companies()))
+                    .modelsAgreed(result.modelsAgreed())
+                    .fieldsWithConsensus(result.fieldsWithConsensus())
+                    .seededToNeo4j(false)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+        } catch (Exception e) {
+            log.error("Ground truth consensus processor failed for invoice {}", invoiceId, e);
+            throw e;
         }
-
-        ConsensusGroundTruthService.ConsensusResult result =
-                consensusGroundTruthService.computeConsensus(invoiceId, runs);
-
-        if (result.fieldsWithConsensus() == 0) {
-            log.warn("No consensus reached for invoice {}", invoiceId);
-            return null;
-        }
-
-        return GroundTruthConsensus.builder()
-                .invoiceId(invoiceId)
-                .consensusInvoiceNo(result.invoiceNo())
-                .consensusDates(joinAsCsv(result.dates()))
-                .consensusAmounts(joinAsCsv(result.amounts()))
-                .consensusCompanies(joinAsCsv(result.companies()))
-                .modelsAgreed(result.modelsAgreed())
-                .fieldsWithConsensus(result.fieldsWithConsensus())
-                .seededToNeo4j(false)
-                .createdAt(LocalDateTime.now())
-                .build();
     }
 
     private String joinAsCsv(Set<String> values) {

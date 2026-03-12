@@ -4,6 +4,8 @@ package com.research.hbx_invoice_entity_extraction_batch.batch.config;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.jpa.GroundTruthConsensus;
 import com.research.hbx_invoice_entity_extraction_batch.batch.step.groundtruth.GroundTruthConsensusItemReader;
 import com.research.hbx_invoice_entity_extraction_batch.batch.step.groundtruth.GroundTruthConsensusProcessor;
+import com.research.hbx_invoice_entity_extraction_batch.batch.step.groundtruth.GroundTruthConsensusSkipListener;
+import com.research.hbx_invoice_entity_extraction_batch.batch.step.groundtruth.GroundTruthConsensusStepListener;
 import com.research.hbx_invoice_entity_extraction_batch.batch.step.groundtruth.GroundTruthConsensusWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
@@ -27,6 +29,8 @@ public class GroundTruthBatchConfig {
     private final PlatformTransactionManager transactionManager;
     private final GroundTruthConsensusProcessor groundTruthConsensusProcessor;
     private final GroundTruthConsensusWriter groundTruthConsensusWriter;
+    private final GroundTruthConsensusStepListener groundTruthConsensusStepListener;
+    private final GroundTruthConsensusSkipListener groundTruthConsensusSkipListener;
 
     @Bean
     public GroundTruthConsensusItemReader groundTruthConsensusItemReader(DataSource dataSource) {
@@ -40,6 +44,8 @@ public class GroundTruthBatchConfig {
                 .reader(groundTruthConsensusItemReader)
                 .processor(groundTruthConsensusProcessor)
                 .writer(groundTruthConsensusWriter)
+                .listener(groundTruthConsensusStepListener)
+                .listener(groundTruthConsensusSkipListener)
                 .faultTolerant()
                 .skip(Exception.class)
                 .skipLimit(50)

@@ -30,7 +30,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ConsensusGroundTruthService {
 
-    private static final Set<String> TARGET_MODELS = Set.of("gemini", "llama", "mistral", "regex");
     private static final DateTimeFormatter DATE_OUTPUT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final List<DateTimeFormatter> DATE_INPUT_FORMATS = List.of(
             DateTimeFormatter.ofPattern("dd.MM.yyyy"),
@@ -44,34 +43,37 @@ public class ConsensusGroundTruthService {
 
     public ConsensusResult computeConsensus(String invoiceId, List<ExtractionRun> runs) {
         if (runs == null || runs.isEmpty()) {
-            return new ConsensusResult(invoiceId, null, Set.of(), Set.of(), Set.of(), 0, 0);
+            return new ConsensusResult(invoiceId, null, Set.of(), Set.of(), Set.of(), 0, 0, 0);
         }
 
         Map<String, ExtractionRun> runByModel = new LinkedHashMap<>();
         for (ExtractionRun run : runs) {
-            if (run == null || run.getRunNumber() == null || run.getRunNumber() != 1) {
+            if (run == null) {
+                continue;
+            }
+            if (run.getRunNumber() == null || run.getRunNumber() != 1) {
                 continue;
             }
             if (!"COMPLETED".equalsIgnoreCase(run.getExtractionStatus())) {
                 continue;
             }
-            String canonical = canonicalModel(run.getModelName());
-            if (!TARGET_MODELS.contains(canonical)) {
+            String modelKey = normalizeModelKey(run.getModelName());
+            if (modelKey == null) {
                 continue;
             }
-            // Keep one run per model for run_number=1.
-            runByModel.putIfAbsent(canonical, run);
+            runByModel.putIfAbsent(modelKey, run);
         }
 
-        int modelsAgreed = runByModel.size();
-        if (modelsAgreed == 0) {
-            return new ConsensusResult(invoiceId, null, Set.of(), Set.of(), Set.of(), 0, 0);
+        int modelsConsidered = runByModel.size();
+        if (modelsConsidered == 0) {
+            return new ConsensusResult(invoiceId, null, Set.of(), Set.of(), Set.of(), 0, 0, 0);
         }
+        int requiredVotes = (modelsConsidered / 2) + 1;
 
-        String consensusInvoiceNo = computeInvoiceNoConsensus(runByModel.values());
-        Set<String> consensusDates = computeSetConsensus(runByModel.values(), "DATE", this::normalizeDateValue);
-        Set<String> consensusAmounts = computeSetConsensus(runByModel.values(), "AMOUNT", this::normalizeAmountValue);
-        Set<String> consensusCompanies = computeCompanyConsensus(runByModel.values());
+        String consensusInvoiceNo = computeInvoiceNoConsensus(runByModel.values(), requiredVotes);
+        Set<String> consensusDates = computeSetConsensus(runByModel.values(), "DATE", this::normalizeDateValue, requiredVotes);
+        Set<String> consensusAmounts = computeSetConsensus(runByModel.values(), "AMOUNT", this::normalizeAmountValue, requiredVotes);
+        Set<String> consensusCompanies = computeCompanyConsensus(runByModel.values(), requiredVotes);
 
         int fieldsWithConsensus = 0;
         if (consensusInvoiceNo != null) {
@@ -93,12 +95,13 @@ public class ConsensusGroundTruthService {
                 consensusDates,
                 consensusAmounts,
                 consensusCompanies,
-                modelsAgreed,
+                modelsConsidered,
+                requiredVotes,
                 fieldsWithConsensus
         );
     }
 
-    private String computeInvoiceNoConsensus(Iterable<ExtractionRun> modelRuns) {
+    private String computeInvoiceNoConsensus(Iterable<ExtractionRun> modelRuns, int requiredVotes) {
         Map<String, Integer> counts = new HashMap<>();
         for (ExtractionRun run : modelRuns) {
             String raw = extractFieldAsString(run.getExtractedJson(), "INVOICE_NO");
@@ -122,7 +125,7 @@ public class ConsensusGroundTruthService {
             }
         }
 
-        if (max >= 2 && winners.size() == 1) {
+        if (max >= requiredVotes && winners.size() == 1) {
             return winners.get(0);
         }
         return null;
@@ -131,7 +134,8 @@ public class ConsensusGroundTruthService {
     private Set<String> computeSetConsensus(
             Iterable<ExtractionRun> modelRuns,
             String field,
-            java.util.function.Function<String, String> normalizer
+            java.util.function.Function<String, String> normalizer,
+            int requiredVotes
     ) {
         Map<String, Integer> valueModelCounts = new HashMap<>();
 
@@ -151,7 +155,7 @@ public class ConsensusGroundTruthService {
 
         List<String> consensus = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : valueModelCounts.entrySet()) {
-            if (entry.getValue() >= 3) {
+            if (entry.getValue() >= requiredVotes) {
                 consensus.add(entry.getKey());
             }
         }
@@ -159,7 +163,7 @@ public class ConsensusGroundTruthService {
         return new LinkedHashSet<>(consensus);
     }
 
-    private Set<String> computeCompanyConsensus(Iterable<ExtractionRun> modelRuns) {
+    private Set<String> computeCompanyConsensus(Iterable<ExtractionRun> modelRuns, int requiredVotes) {
         Map<String, Integer> valueModelCounts = new HashMap<>();
         Map<String, String> displayByKey = new HashMap<>();
 
@@ -180,7 +184,7 @@ public class ConsensusGroundTruthService {
 
         List<String> consensus = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : valueModelCounts.entrySet()) {
-            if (entry.getValue() >= 3) {
+            if (entry.getValue() >= requiredVotes) {
                 consensus.add(displayByKey.getOrDefault(entry.getKey(), toTitleCase(entry.getKey())));
             }
         }
@@ -253,24 +257,12 @@ public class ConsensusGroundTruthService {
                 .orElse("");
     }
 
-    private String canonicalModel(String modelName) {
+    private String normalizeModelKey(String modelName) {
         if (modelName == null) {
             return null;
         }
-        String v = modelName.trim().toLowerCase(Locale.ROOT);
-        if (v.contains("gemini")) {
-            return "gemini";
-        }
-        if (v.contains("llama")) {
-            return "llama";
-        }
-        if (v.contains("mistral")) {
-            return "mistral";
-        }
-        if (v.equals("regex")) {
-            return "regex";
-        }
-        return null;
+        String normalized = modelName.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        return normalized.isBlank() ? null : normalized;
     }
 
     private Set<String> extractFieldAsSet(String json, String field) {
@@ -329,6 +321,7 @@ public class ConsensusGroundTruthService {
             Set<String> amounts,
             Set<String> companies,
             int modelsAgreed,
+            int requiredVotes,
             int fieldsWithConsensus
     ) {
     }
