@@ -80,13 +80,6 @@ vertex:
       location: ${VERTEX_MAAS_LLAMA4_LOCATION:us-east5}
       stream: ${VERTEX_MAAS_LLAMA4_STREAM:false}
 
-groq:
-  api:
-    enabled: ${GROQ_API_ENABLED:false}
-    key: ${GROQ_API_KEY:your-groq-key}
-    endpoint: ${GROQ_API_ENDPOINT:https://api.groq.com/openai/v1/chat/completions}
-    model: ${GROQ_API_MODEL:llama-3.3-70b-versatile}
-
 mistral:
   api:
     key: ${MISTRAL_API_KEY:your-mistral-key}
