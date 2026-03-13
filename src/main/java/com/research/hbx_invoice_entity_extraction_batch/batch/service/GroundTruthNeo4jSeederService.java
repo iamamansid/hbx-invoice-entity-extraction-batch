@@ -44,10 +44,7 @@ public class GroundTruthNeo4jSeederService {
 
                 // Step C
                 for (String value : splitCsv(gt.getConsensusDates())) {
-                    String normalizedDate = normalizationService.normalizeDate(value);
-                    if (normalizedDate == null) {
-                        continue;
-                    }
+                    String normalizedDate = normalizeOrFallback(value, normalizationService::normalizeDate);
                     tx.run("""
                             MATCH (i:InvoiceNode {invoiceNo: $invoiceNo, isGroundTruth: true})
                             MERGE (d:DateNode {value: $value, isGroundTruth: true})
@@ -57,11 +54,12 @@ public class GroundTruthNeo4jSeederService {
 
                 // Step D
                 for (String value : splitCsv(gt.getConsensusAmounts())) {
+                    String normalizedAmount = normalizeOrFallback(value, normalizationService::normalizeAmount);
                     tx.run("""
                             MATCH (i:InvoiceNode {invoiceNo: $invoiceNo, isGroundTruth: true})
                             MERGE (a:AmountNode {value: $value, isGroundTruth: true})
                             MERGE (i)-[:HAS_AMOUNT]->(a)
-                            """, Map.of("invoiceNo", invoiceNo, "value", value));
+                            """, Map.of("invoiceNo", invoiceNo, "value", normalizedAmount));
                 }
 
                 // Step E
@@ -95,5 +93,13 @@ public class GroundTruthNeo4jSeederService {
                 .filter(s -> !s.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toList());
+    }
+
+    private String normalizeOrFallback(String rawValue, java.util.function.Function<String, String> normalizer) {
+        String normalizedValue = normalizer.apply(rawValue);
+        if (normalizedValue == null || normalizedValue.isBlank()) {
+            return rawValue;
+        }
+        return normalizedValue;
     }
 }
