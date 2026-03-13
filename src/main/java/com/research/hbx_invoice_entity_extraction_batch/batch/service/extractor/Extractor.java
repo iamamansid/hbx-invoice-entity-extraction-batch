@@ -10,8 +10,8 @@ public interface Extractor {
     default double getTemperature(int runNumber) {
         return switch (runNumber) {
             case 1 -> 0.0;
-            case 2 -> 0.7;
-            case 3 -> 1.0;
+            case 2 -> 0.3;
+            case 3 -> 0.5;
             default -> 0.0;
         };
     }
