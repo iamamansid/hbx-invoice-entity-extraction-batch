@@ -83,6 +83,10 @@ public class GeminiExtractor extends AbstractLlmExtractor {
                 String responseBody = invokeGeminiWithRetry(prompt, runNumber);
                 latency = System.currentTimeMillis() - start;
                 responseJson = objectMapper.readTree(responseBody);
+                log.debug("Gemini raw response structure for invoice {}: candidates={}, firstCandidatePartCount={}",
+                        invoiceId,
+                        responseJson.path("candidates").size(),
+                        responseJson.path("candidates").path(0).path("content").path("parts").size());
             } catch (Exception e) {
                 return ExtractionRunResult.builder()
                         .invoiceId(invoiceId)
@@ -198,31 +202,63 @@ public class GeminiExtractor extends AbstractLlmExtractor {
         try {
             JsonNode candidates = responseBody.get("candidates");
             if (candidates == null || !candidates.isArray() || candidates.isEmpty()) {
-                log.error("Gemini response has no candidates");
+                String rawResponse = responseBody.toString();
+                log.error("Gemini response has no candidates. Full response: {}",
+                        rawResponse.substring(0, Math.min(500, rawResponse.length())));
                 return null;
             }
+
             JsonNode candidate = candidates.get(0);
 
             String finishReason = candidate.path("finishReason").asText("STOP");
             if ("MAX_TOKENS".equals(finishReason)) {
                 log.warn("Gemini hit MAX_TOKENS - attempting partial recovery");
-                String partial = candidate.path("content")
-                        .path("parts")
-                        .path(0)
-                        .path("text")
-                        .asText(null);
+                String partial = extractTextFromParts(candidate);
                 return recoverPartialJson(partial);
             }
 
-            return candidate.path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text")
-                    .asText(null);
+            if ("SAFETY".equals(finishReason) || "RECITATION".equals(finishReason)) {
+                log.warn("Gemini blocked response: finishReason={}", finishReason);
+                return null;
+            }
+
+            return extractTextFromParts(candidate);
         } catch (Exception e) {
             log.error("Failed to extract Gemini response text", e);
             return null;
         }
+    }
+
+    /**
+     * Iterates through all parts and returns the last non-thought text.
+     * Gemini 2.5 Pro thinking mode can put thought content first and the actual response last.
+     */
+    private String extractTextFromParts(JsonNode candidate) {
+        JsonNode parts = candidate.path("content").path("parts");
+        if (parts.isMissingNode() || !parts.isArray() || parts.isEmpty()) {
+            log.warn("Gemini candidate has no parts");
+            return null;
+        }
+
+        String lastNonThoughtText = null;
+        for (JsonNode part : parts) {
+            boolean isThought = part.path("thought").asBoolean(false);
+            if (isThought) {
+                log.debug("Skipping thought part ({} chars)", part.path("text").asText("").length());
+                continue;
+            }
+
+            String text = part.path("text").asText(null);
+            if (text != null && !text.isBlank()) {
+                lastNonThoughtText = text;
+            }
+        }
+
+        if (lastNonThoughtText == null) {
+            log.warn("No non-thought text found in {} parts", parts.size());
+        }
+
+        return lastNonThoughtText;
     }
 
     private String recoverPartialJson(String truncated) {
