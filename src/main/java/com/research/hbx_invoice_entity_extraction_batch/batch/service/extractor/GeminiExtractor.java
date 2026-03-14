@@ -27,9 +27,6 @@
  */
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.ExtractionRunResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +39,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -83,10 +82,7 @@ public class GeminiExtractor extends AbstractLlmExtractor {
                 String responseBody = invokeGeminiWithRetry(prompt, runNumber);
                 latency = System.currentTimeMillis() - start;
                 responseJson = objectMapper.readTree(responseBody);
-                log.debug("Gemini raw response structure for invoice {}: candidates={}, firstCandidatePartCount={}",
-                        invoiceId,
-                        responseJson.path("candidates").size(),
-                        responseJson.path("candidates").path(0).path("content").path("parts").size());
+                logResponseStructure(invoiceId, responseJson);
             } catch (Exception e) {
                 return ExtractionRunResult.builder()
                         .invoiceId(invoiceId)
@@ -112,7 +108,7 @@ public class GeminiExtractor extends AbstractLlmExtractor {
 
             try {
                 objectMapper.readTree(rawText);
-            } catch (JsonProcessingException e) {
+            } catch (Exception e) {
                 return ExtractionRunResult.builder()
                         .invoiceId(invoiceId)
                         .modelName(getModelName())
@@ -123,9 +119,7 @@ public class GeminiExtractor extends AbstractLlmExtractor {
                         .build();
             }
 
-            int tokenCount = responseJson.path("usageMetadata")
-                    .path("candidatesTokenCount")
-                    .asInt(0);
+            int tokenCount = extractTokenCount(responseJson);
 
             return ExtractionRunResult.builder()
                     .invoiceId(invoiceId)
@@ -192,41 +186,95 @@ public class GeminiExtractor extends AbstractLlmExtractor {
 
     @Override
     protected int extractTokenCount(String responseBody) throws Exception {
-        JsonNode root = objectMapper.readTree(responseBody);
-        return root.path("usageMetadata")
-                .path("candidatesTokenCount")
-                .asInt(0);
+        return extractTokenCount(objectMapper.readTree(responseBody));
     }
 
     private String extractGeminiText(JsonNode responseBody) {
         try {
-            JsonNode candidates = responseBody.get("candidates");
-            if (candidates == null || !candidates.isArray() || candidates.isEmpty()) {
-                String rawResponse = responseBody.toString();
-                log.error("Gemini response has no candidates. Full response: {}",
-                        rawResponse.substring(0, Math.min(500, rawResponse.length())));
+            if (responseBody == null || responseBody.isNull() || responseBody.isMissingNode()) {
                 return null;
             }
 
-            JsonNode candidate = candidates.get(0);
-
-            String finishReason = candidate.path("finishReason").asText("STOP");
-            if ("MAX_TOKENS".equals(finishReason)) {
-                log.warn("Gemini hit MAX_TOKENS - attempting partial recovery");
-                String partial = extractTextFromParts(candidate);
-                return recoverPartialJson(partial);
+            if (responseBody.isArray()) {
+                return extractGeminiTextFromStreamChunks(responseBody);
             }
 
-            if ("SAFETY".equals(finishReason) || "RECITATION".equals(finishReason)) {
-                log.warn("Gemini blocked response: finishReason={}", finishReason);
-                return null;
-            }
-
-            return extractTextFromParts(candidate);
+            return extractGeminiTextFromSinglePayload(responseBody);
         } catch (Exception e) {
             log.error("Failed to extract Gemini response text", e);
             return null;
         }
+    }
+
+    private String extractGeminiTextFromSinglePayload(JsonNode responseBody) {
+        JsonNode candidates = responseBody.path("candidates");
+        if (!candidates.isArray() || candidates.isEmpty()) {
+            logMissingCandidates(responseBody);
+            return null;
+        }
+        return extractGeminiTextFromCandidate(candidates.get(0));
+    }
+
+    private String extractGeminiTextFromStreamChunks(JsonNode responseBody) {
+        StringBuilder merged = new StringBuilder();
+        int candidateChunks = 0;
+        String terminalFinishReason = "STOP";
+
+        for (JsonNode chunk : responseBody) {
+            JsonNode candidates = chunk.path("candidates");
+            if (!candidates.isArray() || candidates.isEmpty()) {
+                continue;
+            }
+
+            JsonNode candidate = candidates.get(0);
+            candidateChunks++;
+
+            String finishReason = candidate.path("finishReason").asText("");
+            if (!finishReason.isBlank()) {
+                terminalFinishReason = finishReason;
+            }
+
+            appendTextFromParts(candidate, merged);
+        }
+
+        if (candidateChunks == 0) {
+            logMissingCandidates(responseBody);
+            return null;
+        }
+
+        if ("SAFETY".equals(terminalFinishReason) || "RECITATION".equals(terminalFinishReason)) {
+            log.warn("Gemini blocked streamed response: finishReason={}", terminalFinishReason);
+            return null;
+        }
+
+        if (merged.isEmpty()) {
+            log.warn("Gemini stream response had {} candidate chunks but no non-thought text", candidateChunks);
+            return null;
+        }
+
+        String mergedText = merged.toString();
+        if ("MAX_TOKENS".equals(terminalFinishReason)) {
+            log.warn("Gemini stream hit MAX_TOKENS - attempting partial recovery");
+            return recoverPartialJson(mergedText);
+        }
+
+        return mergedText;
+    }
+
+    private String extractGeminiTextFromCandidate(JsonNode candidate) {
+        String finishReason = candidate.path("finishReason").asText("STOP");
+        if ("MAX_TOKENS".equals(finishReason)) {
+            log.warn("Gemini hit MAX_TOKENS - attempting partial recovery");
+            String partial = extractTextFromParts(candidate);
+            return recoverPartialJson(partial);
+        }
+
+        if ("SAFETY".equals(finishReason) || "RECITATION".equals(finishReason)) {
+            log.warn("Gemini blocked response: finishReason={}", finishReason);
+            return null;
+        }
+
+        return extractTextFromParts(candidate);
     }
 
     /**
@@ -259,6 +307,76 @@ public class GeminiExtractor extends AbstractLlmExtractor {
         }
 
         return lastNonThoughtText;
+    }
+
+    private void appendTextFromParts(JsonNode candidate, StringBuilder merged) {
+        JsonNode parts = candidate.path("content").path("parts");
+        if (parts.isMissingNode() || !parts.isArray() || parts.isEmpty()) {
+            return;
+        }
+
+        for (JsonNode part : parts) {
+            boolean isThought = part.path("thought").asBoolean(false);
+            if (isThought) {
+                continue;
+            }
+
+            String text = part.path("text").asText(null);
+            if (text != null && !text.isBlank()) {
+                merged.append(text);
+            }
+        }
+    }
+
+    private int extractTokenCount(JsonNode responseBody) {
+        if (responseBody == null || responseBody.isNull() || responseBody.isMissingNode()) {
+            return 0;
+        }
+
+        if (responseBody.isArray()) {
+            for (int i = responseBody.size() - 1; i >= 0; i--) {
+                JsonNode usageMetadata = responseBody.get(i).path("usageMetadata");
+                int candidatesTokenCount = usageMetadata.path("candidatesTokenCount").asInt(0);
+                if (candidatesTokenCount > 0) {
+                    return candidatesTokenCount;
+                }
+                int totalTokenCount = usageMetadata.path("totalTokenCount").asInt(0);
+                if (totalTokenCount > 0) {
+                    return totalTokenCount;
+                }
+            }
+            return 0;
+        }
+
+        JsonNode usageMetadata = responseBody.path("usageMetadata");
+        int candidatesTokenCount = usageMetadata.path("candidatesTokenCount").asInt(0);
+        if (candidatesTokenCount > 0) {
+            return candidatesTokenCount;
+        }
+        return usageMetadata.path("totalTokenCount").asInt(0);
+    }
+
+    private void logResponseStructure(String invoiceId, JsonNode responseJson) {
+        if (responseJson.isArray()) {
+            JsonNode lastChunk = responseJson.isEmpty() ? null : responseJson.get(responseJson.size() - 1);
+            log.debug("Gemini raw stream response for invoice {}: chunks={}, lastChunkCandidates={}, lastChunkPartCount={}",
+                    invoiceId,
+                    responseJson.size(),
+                    lastChunk == null ? 0 : lastChunk.path("candidates").size(),
+                    lastChunk == null ? 0 : lastChunk.path("candidates").path(0).path("content").path("parts").size());
+            return;
+        }
+
+        log.debug("Gemini raw response structure for invoice {}: candidates={}, firstCandidatePartCount={}",
+                invoiceId,
+                responseJson.path("candidates").size(),
+                responseJson.path("candidates").path(0).path("content").path("parts").size());
+    }
+
+    private void logMissingCandidates(JsonNode responseBody) {
+        String rawResponse = responseBody.toString();
+        log.error("Gemini response has no candidates. Full response: {}",
+                rawResponse.substring(0, Math.min(500, rawResponse.length())));
     }
 
     private String recoverPartialJson(String truncated) {

@@ -1,6 +1,7 @@
 package com.research.hbx_invoice_entity_extraction_batch.batch.service;
 
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.jpa.EvaluationResult;
+import com.research.hbx_invoice_entity_extraction_batch.batch.repository.GroundTruthConsensusRepository;
 import lombok.RequiredArgsConstructor;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
@@ -20,13 +21,15 @@ import java.util.Set;
 public class EvaluationService {
 
     private final Driver neo4jDriver;
+    private final GroundTruthConsensusRepository groundTruthConsensusRepository;
 
     public EvaluationResult evaluateExtraction(String invoiceId, String modelName, int runNumber) {
         try (Session session = neo4jDriver.session()) {
+            String groundTruthInvoiceNo = resolveGroundTruthInvoiceNo(invoiceId);
 
             // 1. Get Ground Truth
             String gtQuery = """
-                MATCH (i:InvoiceNode {isGroundTruth: true, invoiceNo: $invoiceNo})
+                MATCH (i:InvoiceNode {isGroundTruth: true, model: 'ground_truth', invoiceNo: $invoiceNo})
                 OPTIONAL MATCH (i)-[:HAS_DATE]->(d:DateNode)
                 OPTIONAL MATCH (i)-[:HAS_AMOUNT]->(a:AmountNode)  
                 OPTIONAL MATCH (i)-[:ISSUED_TO]->(c:CompanyNode)
@@ -35,7 +38,7 @@ public class EvaluationService {
                        collect(DISTINCT c.name) AS companies
                 """;
 
-            Result gtResult = session.run(gtQuery, Map.of("invoiceNo", invoiceId));
+            Result gtResult = session.run(gtQuery, Map.of("invoiceNo", groundTruthInvoiceNo));
             if (!gtResult.hasNext()) {
                 throw new GroundTruthNotFoundException("Ground truth not found for invoice " + invoiceId);
             }
@@ -119,6 +122,18 @@ public class EvaluationService {
                     .build();
 
         }
+    }
+
+    String resolveGroundTruthInvoiceNo(String invoiceId) {
+        return groundTruthConsensusRepository.findById(invoiceId)
+                .map(groundTruth -> {
+                    String consensusInvoiceNo = groundTruth.getConsensusInvoiceNo();
+                    if (consensusInvoiceNo == null || consensusInvoiceNo.isBlank()) {
+                        return invoiceId;
+                    }
+                    return consensusInvoiceNo.trim();
+                })
+                .orElse(invoiceId);
     }
 
     private Set<String> collectValues(Record record, String key) {

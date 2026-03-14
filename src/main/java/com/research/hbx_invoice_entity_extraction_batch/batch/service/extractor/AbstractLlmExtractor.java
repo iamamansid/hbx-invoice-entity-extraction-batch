@@ -1,8 +1,6 @@
 // src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/AbstractLlmExtractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.ExtractionRunResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -13,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 public abstract class AbstractLlmExtractor implements Extractor {
@@ -90,7 +89,7 @@ public abstract class AbstractLlmExtractor implements Extractor {
             // Validate JSON
             try {
                 objectMapper.readTree(extractedContent);
-            } catch (JsonProcessingException e) {
+            } catch (Exception e) {
                 return ExtractionRunResult.builder()
                         .invoiceId(invoiceId)
                         .modelName(getModelName())

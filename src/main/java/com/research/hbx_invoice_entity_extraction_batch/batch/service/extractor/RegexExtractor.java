@@ -1,9 +1,6 @@
 // src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/extractor/RegexExtractor.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.ExtractionRunResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.service.NormalizationService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;

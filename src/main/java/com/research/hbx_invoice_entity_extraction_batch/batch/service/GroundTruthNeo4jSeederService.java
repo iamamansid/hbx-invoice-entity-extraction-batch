@@ -25,13 +25,17 @@ public class GroundTruthNeo4jSeederService {
         try (Session session = neo4jDriver.session()) {
             session.executeWrite(tx -> {
                 String invoiceNo = resolveInvoiceNo(gt);
+                Map<String, Object> groundTruthNodeParams = Map.of(
+                        "invoiceNo", invoiceNo,
+                        "sourceInvoiceId", gt.getInvoiceId()
+                );
 
                 // Step A
                 tx.run("""
                         MERGE (i:InvoiceNode {invoiceNo: $invoiceNo, isGroundTruth: true})
-                        ON CREATE SET i.model = 'ground_truth', i.createdAt = datetime()
-                        ON MATCH SET i.updatedAt = datetime()
-                        """, Map.of("invoiceNo", invoiceNo));
+                        ON CREATE SET i.model = 'ground_truth', i.sourceInvoiceId = $sourceInvoiceId, i.createdAt = datetime()
+                        ON MATCH SET i.model = 'ground_truth', i.sourceInvoiceId = $sourceInvoiceId, i.updatedAt = datetime()
+                        """, groundTruthNodeParams);
 
                 // Step B
                 tx.run("""

@@ -1,7 +1,5 @@
 package com.research.hbx_invoice_entity_extraction_batch.batch.step.evaluation;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.EvaluationBundle;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.jpa.EvaluationResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.jpa.ExtractionRun;
@@ -12,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.HashSet;

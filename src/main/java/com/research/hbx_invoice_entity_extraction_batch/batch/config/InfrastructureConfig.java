@@ -1,7 +1,6 @@
 // c:\Users\amans\OneDrive\Documents\Repos\hbx-invoice-entity-extraction-batch\src\main\java\com\research\hbx_invoice_entity_extraction_batch\batch\config\InfrastructureConfig.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
@@ -11,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.TimeUnit;
 

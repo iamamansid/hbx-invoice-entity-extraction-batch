@@ -1,9 +1,9 @@
 package com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -84,5 +84,44 @@ class GeminiExtractorTest {
         String extracted = extractor.parseContentFromResponse(responseBody);
 
         assertThat(extracted).isEqualTo("{\"invoice_no\":\"INV-123\",\"dates\":[\"2024-01-01\"]}");
+    }
+
+    @Test
+    void parseContentFromResponseMergesStreamedChunkResponses() throws Exception {
+        String responseBody = """
+                [
+                  {
+                    "candidates": [
+                      {
+                        "content": {
+                          "parts": [
+                            { "text": "{\\"invoice_no\\":\\"INV" }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "candidates": [
+                      {
+                        "finishReason": "STOP",
+                        "content": {
+                          "parts": [
+                            { "text": "-123\\",\\"company\\":\\"Acme\\"}" }
+                          ]
+                        }
+                      }
+                    ],
+                    "usageMetadata": {
+                      "candidatesTokenCount": 42
+                    }
+                  }
+                ]
+                """;
+
+        String extracted = extractor.parseContentFromResponse(responseBody);
+
+        assertThat(extracted).isEqualTo("{\"invoice_no\":\"INV-123\",\"company\":\"Acme\"}");
+        assertThat(extractor.extractTokenCount(responseBody)).isEqualTo(42);
     }
 }

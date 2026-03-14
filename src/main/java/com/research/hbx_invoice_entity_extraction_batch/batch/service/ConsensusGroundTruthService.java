@@ -1,12 +1,12 @@
 // src/main/java/com/research/hbx_invoice_entity_extraction_batch/batch/service/ConsensusGroundTruthService.java
 package com.research.hbx_invoice_entity_extraction_batch.batch.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.jpa.ExtractionRun;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
