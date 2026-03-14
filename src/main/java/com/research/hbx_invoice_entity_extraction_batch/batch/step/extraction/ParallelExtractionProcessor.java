@@ -4,6 +4,7 @@ import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.Extracti
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.ExtractionRunResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.model.dto.InvoiceOcrResult;
 import com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor.Extractor;
+import com.research.hbx_invoice_entity_extraction_batch.batch.service.extractor.NemotronExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
@@ -16,20 +17,26 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Component
 public class ParallelExtractionProcessor implements ItemProcessor<InvoiceOcrResult, ExtractionBundle> {
 
     private final List<Extractor> extractors;
+    private final NemotronExtractor nemotronExtractor;
     private final ExecutorService executorService;
 
-    public ParallelExtractionProcessor(List<Extractor> extractors) {
-        this.extractors = extractors;
-        int threadCount = Math.max(8, extractors.size() * 3);
+    public ParallelExtractionProcessor(List<Extractor> extractors, NemotronExtractor nemotronExtractor) {
+        this.nemotronExtractor = nemotronExtractor;
+        this.extractors = extractors.stream()
+                .filter(extractor -> extractor != nemotronExtractor)
+                .toList();
+        int threadCount = Math.max(8, (this.extractors.size() + 1) * 3);
         this.executorService = Executors.newFixedThreadPool(threadCount);
-        log.info("Configured {} extraction models: {}", extractors.size(),
-                extractors.stream().map(Extractor::getModelName).collect(Collectors.joining(", ")));
+        log.info("Configured {} extraction models: {}", this.extractors.size() + 1,
+                Stream.concat(this.extractors.stream().map(Extractor::getModelName), Stream.of(nemotronExtractor.getModelName()))
+                        .collect(Collectors.joining(", ")));
     }
 
     @Override
@@ -38,12 +45,12 @@ public class ParallelExtractionProcessor implements ItemProcessor<InvoiceOcrResu
 
         String textToProcess = item.getNormalizedText() != null ? item.getNormalizedText() : item.getRawText();
         
+        List<ExtractionRunResult> results = new ArrayList<>();
         if (textToProcess == null || textToProcess.isEmpty()) {
-            log.warn("Invoice {} has no text to extract; marking all model runs as FAILED", item.getInvoiceId());
-            List<ExtractionRunResult> failed = new ArrayList<>();
+            log.warn("Invoice {} has no text to extract; marking text model runs as FAILED", item.getInvoiceId());
             for (Extractor extractor : extractors) {
                 for (int runNumber = 1; runNumber <= 3; runNumber++) {
-                    failed.add(ExtractionRunResult.builder()
+                    results.add(ExtractionRunResult.builder()
                             .invoiceId(item.getInvoiceId())
                             .modelName(extractor.getModelName())
                             .runNumber(runNumber)
@@ -52,46 +59,65 @@ public class ParallelExtractionProcessor implements ItemProcessor<InvoiceOcrResu
                             .build());
                 }
             }
-            return ExtractionBundle.builder()
-                    .invoiceId(item.getInvoiceId())
-                    .results(failed)
-                    .build();
         }
 
         List<CompletableFuture<ExtractionRunResult>> futures = new ArrayList<>();
 
-        for (Extractor extractor : extractors) {
-            for (int runNumber = 1; runNumber <= 3; runNumber++) {
-                final int currentRun = runNumber;
-                
-                CompletableFuture<ExtractionRunResult> future = CompletableFuture.supplyAsync(() -> {
-                    try {
-                        return extractor.extract(item.getInvoiceId(), textToProcess, currentRun);
-                    } catch (Exception e) {
-                        log.error("Fatal error in extractor {} for invoice {}, run {}", extractor.getModelName(), item.getInvoiceId(), currentRun, e);
-                        return ExtractionRunResult.builder()
-                                .invoiceId(item.getInvoiceId())
-                                .modelName(extractor.getModelName())
-                                .runNumber(currentRun)
-                                .extractionStatus("FAILED")
-                                .errorMessage(e.getMessage())
-                                .build();
-                    }
-                }, executorService);
-                
-                futures.add(future);
+        if (textToProcess != null && !textToProcess.isEmpty()) {
+            for (Extractor extractor : extractors) {
+                for (int runNumber = 1; runNumber <= 3; runNumber++) {
+                    final int currentRun = runNumber;
+
+                    CompletableFuture<ExtractionRunResult> future = CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return extractor.extract(item.getInvoiceId(), textToProcess, currentRun);
+                        } catch (Exception e) {
+                            log.error("Fatal error in extractor {} for invoice {}, run {}", extractor.getModelName(), item.getInvoiceId(), currentRun, e);
+                            return ExtractionRunResult.builder()
+                                    .invoiceId(item.getInvoiceId())
+                                    .modelName(extractor.getModelName())
+                                    .runNumber(currentRun)
+                                    .extractionStatus("FAILED")
+                                    .errorMessage(e.getMessage())
+                                    .build();
+                        }
+                    }, executorService);
+
+                    futures.add(future);
+                }
             }
         }
 
-        // Wait for all to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        CompletableFuture<List<ExtractionRunResult>> nemotronFuture = CompletableFuture.supplyAsync(() -> {
+            List<ExtractionRunResult> nemotronResults = new ArrayList<>();
+            for (int run = 1; run <= 3; run++) {
+                try {
+                    nemotronResults.add(nemotronExtractor.extract(item.getInvoiceId(), item.getGcsPath(), run));
+                } catch (Exception e) {
+                    log.error("Fatal error in extractor {} for invoice {}, run {}", nemotronExtractor.getModelName(), item.getInvoiceId(), run, e);
+                    nemotronResults.add(ExtractionRunResult.builder()
+                            .invoiceId(item.getInvoiceId())
+                            .modelName(nemotronExtractor.getModelName())
+                            .runNumber(run)
+                            .extractionStatus("FAILED")
+                            .errorMessage(e.getMessage())
+                            .build());
+                }
+            }
+            return nemotronResults;
+        }, executorService);
 
-        // Collect results
-        List<ExtractionRunResult> results = futures.stream()
+        List<CompletableFuture<?>> allFutures = new ArrayList<>(futures);
+        allFutures.add(nemotronFuture);
+        CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0])).join();
+
+        results.addAll(futures.stream()
                 .map(CompletableFuture::join)
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        results.addAll(nemotronFuture.join());
 
-        for (Extractor extractor : extractors) {
+        List<Extractor> allExtractors = Stream.concat(extractors.stream(), Stream.of(nemotronExtractor)).toList();
+        for (Extractor extractor : allExtractors) {
             long failedForModel = results.stream()
                     .filter(r -> extractor.getModelName().equals(r.getModelName()))
                     .filter(r -> "FAILED".equals(r.getExtractionStatus()))

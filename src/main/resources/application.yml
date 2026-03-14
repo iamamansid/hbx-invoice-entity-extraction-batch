@@ -87,6 +87,11 @@ mistral:
     name: ${MISTRAL_API_NAME:mistral-medium}
     model: ${MISTRAL_API_MODEL:mistral-medium-latest}
 
+nvidia:
+  api:
+    key: ${NVIDIA_API_KEY}
+    endpoint: https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v1
+
 regex:
   extractor:
     enabled: ${REGEX_EXTRACTOR_ENABLED:false}
